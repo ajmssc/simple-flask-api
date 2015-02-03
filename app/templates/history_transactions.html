@@ -1,0 +1,79 @@
+{% extends "layout/base.html" %}
+
+{% block page_header %}
+	Transaction volume history
+{% endblock %}
+
+{% block content %}
+
+
+<script src="http://code.highcharts.com/stock/highstock.js"></script>
+<script src="http://code.highcharts.com/stock/modules/exporting.js"></script>
+
+<div id="transaction_container" style="height: 400px; min-width: 410px"></div>
+
+
+<script>
+$(function () {
+
+
+    function afterSetTransactionExtremes(e) {
+    	console.log("refresh chart" , Math.round(e.max/1000), Math.round(e.min/1000));
+        var chart = $('#transaction_container').highcharts();
+        chart.showLoading('Loading data from server...');
+        $.getJSON('/api/gettransactionhistory/?start=' + Math.round(e.min/1000) + '&end=' + Math.round(e.max/1000) + '&callback=?', 
+        	function (data) {
+        		console.log(data);
+                chart.series[0].setData(data);
+                chart.hideLoading();
+            });
+    }
+
+    $.getJSON('/api/gettransactionhistory/?callback=?', function (data) {
+    //$.getJSON('http://www.highcharts.com/samples/data/from-sql.php?callback=?', function (data) {
+        //data = [].concat(data, [[Date.UTC(2011, 9, 14, 19, 59), null, null, null, null]]);
+        //data = [].concat(data, [[Date.UTC(), null]]);
+        console.log('create chart');
+        $('#transaction_container').highcharts('StockChart', {
+            chart : {
+                type: 'line', zoomType: 'x'
+            },
+            navigator : {
+                adaptToUpdatedData: false,
+                series : { data : data }
+            },
+            scrollbar: {
+                liveRedraw: false
+            },
+            title: { text: 'Bitcoin transactions' },
+            subtitle: { text: 'Number of transactions' },
+            rangeSelector : {
+                buttons: [{ type: 'hour', count: 1, text: '1h' }, 
+                	{ type: 'day', count: 1, text: '1d' }, 
+                	{ type: 'month', count: 1, text: '1m' }, 
+                	{ type: 'year', count: 1, text: '1y' }, 
+                	{ type: 'all', text: 'All' }],
+                inputEnabled: false,
+                selected : 4
+            },
+            xAxis : {
+                events : { afterSetExtremes : afterSetTransactionExtremes }, minRange: 3600 * 1000 // one hour
+            },
+            yAxis: { floor: 0 },
+            series : [{ data : data, dataGrouping: { enabled: false } }]
+        });
+    });
+
+
+
+
+
+
+});
+</script>
+                    
+{% endblock %}
+
+{% block footer %}
+  {% include "include/footer.html" %}
+{% endblock %}

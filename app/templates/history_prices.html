@@ -1,0 +1,215 @@
+{% extends "layout/base.html" %}
+
+{% block page_header %}
+	Price history (BTC - {{ request.args.get("currency") if request.args.get("currency") != None else "All" }})
+{% endblock %}
+
+{% block content %}
+
+<a href="history_prices">All currencies</a> ||
+<a href="history_prices?currency=USD">Show USD only</a> ||
+<a href="history_prices?currency=RUR">Show RUR only</a> ||
+<a href="history_prices?currency=EUR">Show EUR only</a>
+
+<script src="http://code.highcharts.com/stock/highstock.js"></script>
+<script src="http://code.highcharts.com/stock/modules/exporting.js"></script>
+<div id="prices" style="height: 400px; min-width: 310px"></div>
+
+
+
+<script>
+$(function () {
+    $.extend({ //query string function
+      getUrlVars: function(){
+        var vars = [], hash;
+        var hashes = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
+        for(var i = 0; i < hashes.length; i++)
+        {
+          hash = hashes[i].split('=');
+          vars.push(hash[0]);
+          vars[hash[0]] = hash[1];
+        }
+        return vars;
+      },
+      getUrlVar: function(name){
+        return $.getUrlVars()[name];
+      }
+    });
+
+    var currency = $.getUrlVar('currency');
+
+    var url = '/api/getpricehistory/?callback=?' + (typeof currency != 'undefined' ? '&currency=' + currency : '');
+    if (typeof currency == 'undefined') {
+        $('#prices').highcharts('StockChart', {
+                rangeSelector: { selected: 4 },
+                chart: {
+                    zoomType: 'x'
+                },
+                title: { text: 'Price history across all curencies' },
+                yAxis: {
+                    labels: {
+                        formatter: function () {
+                            return (this.value > 0 ? ' + ' : '') + this.value + '%';
+                        }
+                    },
+                    plotLines: [{
+                        value: 0,
+                        width: 2,
+                        color: 'silver'
+                    }]
+                },
+                plotOptions: {
+                    series: {
+                        compare: 'percent'
+                    }
+                },
+                tooltip: {
+                    pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y}</b> ({point.change}%)<br/>',
+                    valueDecimals: 2
+                },
+                series: []//[{name:'USD',data:[]}]
+            });
+            var chart = $('#prices').highcharts();
+            $.getJSON(url, function (loaddata) {
+                var chart = $('#prices').highcharts();
+                for (var i = 0; i < chart.series.length; i++) { chart.series[i].remove(); }
+                //chart.series[0].setData(data['USD']);
+                $.each(loaddata, function(key, timeseries){
+                    console.log(key, timeseries);
+                    chart.addSeries({name:'BTC-' + key, data:timeseries});
+                });
+                
+            });
+        } else {
+            $.getJSON(url, function (data) {
+                console.log(data);
+                $('#prices').highcharts('StockChart', {
+                    chart : {
+                        type: 'line', zoomType: 'x'
+                    },
+                    plotOptions: {
+                            series: {
+                                compare: 'percent'
+                            }
+                    },
+                    navigator : {
+                        adaptToUpdatedData: false,
+                        series : { data : data }
+                    },
+                    scrollbar: {
+                        liveRedraw: false
+                    },
+                    title: { text: 'Price history for BTC-' + currency },
+                    subtitle: { text: '' },
+                    rangeSelector : {
+                        buttons: [{ type: 'hour', count: 1, text: '1h' }, 
+                         { type: 'day', count: 1, text: '1d' }, 
+                         { type: 'month', count: 1, text: '1m' }, 
+                         { type: 'year', count: 1, text: '1y' }, 
+                         { type: 'all', text: 'All' }],
+                        inputEnabled: false,
+                        selected : 4
+                    },
+                    xAxis : {
+                        events : { afterSetExtremes : function(e) {
+                                console.log("refresh chart" , Math.round(e.max/1000), Math.round(e.min/1000));
+                                var chart = $('#prices').highcharts();
+                                chart.showLoading('Loading data from server...');
+                                $.getJSON(url + '&start=' + Math.round(e.min/1000) + '&end=' + Math.round(e.max/1000), 
+                                    function (data) {
+                                        console.log(data);
+                                        chart.series[0].setData(data);
+                                        chart.hideLoading();
+                                });
+                            }
+                        }, minRange: 3600 * 1000 // one hour
+                    },
+                    //yAxis: { floor: 0 },
+                    series : [{ data : data, dataGrouping: { enabled: false } }]
+                });
+            });
+        }
+    
+        // $.each(names, function (i, name) {
+
+        //     $.getJSON('http://www.highcharts.com/samples/data/jsonp.php?filename=' + name.toLowerCase() + '-c.json&callback=?',    function (data) {
+
+        //         seriesOptions[i] = {
+        //             name: name,
+        //             data: data
+        //         };
+
+        //         // As we're loading the data asynchronously, we don't know what order it will arrive. So
+        //         // we keep a counter and create the chart when all the data is loaded.
+        //         seriesCounter += 1;
+
+        //         if (seriesCounter === names.length) {
+        //             createChart();
+        //         }
+        //     });
+        // });
+
+    // $.getJSON(url, function (data) {
+    //     console.log(data);
+    // //$.getJSON('http://www.highcharts.com/samples/data/from-sql.php?callback=?', function (data) {
+    //     //data = [].concat(data, [[Date.UTC(2011, 9, 14, 19, 59), null, null, null, null]]);
+    //     //data = [].concat(data, [[Date.UTC(), null]]);
+    //     $('#prices').highcharts('StockChart', {
+    //         chart : {
+    //             type: 'line', zoomType: 'x'
+    //         },
+    //         plotOptions: {
+    //                 series: {
+    //                     compare: 'percent'
+    //                 }
+    //         },
+    //         navigator : {
+    //             adaptToUpdatedData: false,
+    //             series : { data : data }
+    //         },
+    //         scrollbar: {
+    //             liveRedraw: false
+    //         },
+    //         title: { text: 'Price history' },
+    //         subtitle: { text: '' },
+    //         rangeSelector : {
+    //             buttons: [{ type: 'hour', count: 1, text: '1h' }, 
+    //             	{ type: 'day', count: 1, text: '1d' }, 
+    //             	{ type: 'month', count: 1, text: '1m' }, 
+    //             	{ type: 'year', count: 1, text: '1y' }, 
+    //             	{ type: 'all', text: 'All' }],
+    //             inputEnabled: false,
+    //             selected : 4
+    //         },
+    //         xAxis : {
+    //             events : { afterSetExtremes : function(e) {
+    //                     console.log("refresh chart" , Math.round(e.max/1000), Math.round(e.min/1000));
+    //                     var chart = $('#prices').highcharts();
+    //                     chart.showLoading('Loading data from server...');
+    //                     $.getJSON('/api/getpricehistory/?start=' + Math.round(e.min/1000) + '&end=' + Math.round(e.max/1000) + '&callback=?' + (typeof currency != 'undefined' ? '&currency=' + currency : ''), 
+    //                         function (data) {
+    //                             console.log(data);
+
+    //                             chart.series[0].setData(data);
+    //                             chart.hideLoading();
+    //                     });
+    //                 }
+    //             }, minRange: 3600 * 1000 // one hour
+    //         },
+    //         yAxis: { floor: 0 },
+    //         series : [{ data : data, dataGrouping: { enabled: false } }]
+    //     });
+    // });
+
+
+
+
+
+});
+</script>
+                    
+{% endblock %}
+
+{% block footer %}
+  {% include "include/footer.html" %}
+{% endblock %}

@@ -1,0 +1,177 @@
+{% extends "layout/base.html" %}
+
+{% block page_header %}
+	Wallet Information
+{% endblock %}
+
+{% block content %}
+
+
+<script src="http://code.highcharts.com/highcharts.js"></script>
+<script src="http://code.highcharts.com/modules/drilldown.js"></script>
+<!-- <script src="http://github.highcharts.com/highcharts.js"></script>
+<script src="http://github.highcharts.com/modules/drilldown.js"></script> -->
+
+
+<div id="container" style="min-width: 610px; height: 600px; margin: 0 auto"></div>
+
+<div id='wallet_list_title'></div>
+<div class="panel panel-default" style="width:900px">
+  <div class="panel-heading">
+      <i class="fa fa-money fa-fw"></i>&nbsp;Wallet list
+  </div>
+  <div class="panel-body">
+      <div id="wallet_list" class="list-group">
+      </div>
+  </div>
+</div>
+
+
+
+<script>
+var wallets_busy = false;
+$(function () {
+
+	//highcharts override to remove underline decoration
+	(function (H) {
+        //DATALABELS
+        H.wrap(H.Series.prototype, 'drawDataLabels', function (proceed) {
+			var css = this.chart.options.drilldown.activeDataLabelStyle;
+			//console.log(css);
+            proceed.call(this);
+            
+// results["dataLabels"] = { 'enabled': True, 'rotation': -90, 'color': '#FFFFFF', 
+// 					'align': 'right', 'x': 4, 'y': 10, 
+// 					'style': { 'fontSize': '13px', 'fontFamily': 'Verdana, sans-serif', 'font-decoration': 'none'} }
+
+            //css.fontSize = '13px';
+            //css.fontFamily = 'Verdana, sans-serif';
+            css.color = '#FFFFFF';
+            css.textDecoration = 'none';
+            css.fontWeight = 'normal';
+            css.cursor = 'default';
+            
+            
+            H.each(this.points, function (point) {
+               
+                if (point.drilldown && point.dataLabel) {
+                    point.dataLabel
+                        .css(css)
+                        .on('click', function () {
+                        return false;
+                    });
+                }
+            });
+        });
+
+        // TICKS
+        H.wrap(H.Point.prototype, 'init', function (proceed, series, options, x) {
+            if (series == null) return 0;
+            var point = proceed.call(this, series, options, x),
+                chart = series.chart,
+                tick = series.xAxis && series.xAxis.ticks[x],
+                tickLabel = tick && tick.label;
+            if (point.drilldown) {
+
+                // Add the click event to the point label
+                H.addEvent(point, 'click', function () {
+                    point.doDrilldown();
+                });
+
+                // Make axis labels clickable
+                if (tickLabel) {
+                    if (!tickLabel._basicStyle) {
+                        tickLabel._basicStyle = tickLabel.element.getAttribute('style');
+                    }
+                    tickLabel.addClass('highcharts-drilldown-axis-label').css({
+                        'text-decoration': 'none',
+                            'font-weight': 'normal',
+                            'cursor': 'auto'
+                    })
+                        .on('click', function () {
+                        if (point.doDrilldown) {
+                            return false;
+                        }
+                    });
+
+                }
+            } else if (tickLabel && tickLabel._basicStyle) {}
+
+            return point;
+        });
+    })(Highcharts);
+
+
+    $.get('/api/getwalletbuckets/?drilldown_level=3', function (data) {
+	    console.log("test");
+	    console.log(data);
+	    $('#container').highcharts({
+	        chart: {
+	            type: 'column',
+	            events: {
+	                drilldown: function (e) {
+	                	console.log("drilldown: ", e.point.name, e.point.drilldown);
+	                	if (!e.seriesOptions && !wallets_busy) {
+	                		wallets_busy = true;
+	                		var chart = $('#container').highcharts();
+							var drill_array = e.point.drilldown.split('_');
+		                	console.log(drill_array);
+		                	var drilldown_level = drill_array[1];
+		                	var lowrange = drill_array[2];
+		                	var highrange = drill_array[3];
+		                	chart.showLoading("Querying new data. Please wait...");
+							$.get('/api/getwalletbuckets/?drilldown_level=' + drilldown_level + '&start=' + lowrange + '&end=' + highrange, function (series_data) {
+								chart.hideLoading();
+								chart.addSeriesAsDrilldown(e.point, series_data);
+								wallets_busy = false;
+							});
+
+							//update list of wallets
+							start = lowrange * Math.pow(10, drilldown_level);
+							end = highrange * Math.pow(10, drilldown_level);
+							$('#wallet_list_title').html('<h2>Looking for wallets between ' + start + ' and ' + end + ' bitcoins...</h2>');
+							$('#wallet_list').html("Loading wallets. Please wait...");
+							$.get('/api/getwalletlist/?start=' + start + '&end=' + end, function (wallet_list) {
+								$('#wallet_list').html("");
+								$('#wallet_list_title').html('<h2>Showing first ' + wallet_list.wallets.length + ' wallets between ' + start + ' and ' + end + ' bitcoins</h2>');
+								$.each(wallet_list.wallets, function(id, wallet) {
+									var html = "<div class='list-group-item'>\
+										<div class='chat-body clearfix'>\
+										    <div class='header'>\
+										        <strong class='primary-font'>" + wallet.address + "</strong>\
+										        <span class='pull-right' style='width:160px; font-size:12pt; text-align:left'>\
+										          <i class='fa fa-bitcoin'></i> " + parseFloat(wallet.balance) + "</span>\
+										    </div>\
+										</div>\
+									</div>";
+									$('#wallet_list').append(html);
+								});
+							});
+						}		
+	                }
+	            }
+	        },
+	        title: { text: 'Distribution of wallet balances (log scale)' },
+	        xAxis: { type: 'category', 
+	        		labels: { rotation: -60, style: { align:'right', fontSize: '14px', textDecoration: 'none', fontFamily: 'Verdana, sans-serif' } }
+        	},
+			yAxis: {
+			    type: 'logarithmic',
+			    minorTickInterval: 1
+			},
+	        legend: { enabled: false },
+	        plotOptions: { series: { borderWidth: 0, groupPadding: 0, dataLabels: { enabled: true } } },
+	        series: [data],
+	        drilldown: { series: [] }
+	    });
+	});
+
+
+});
+</script>
+                    
+{% endblock %}
+
+{% block footer %}
+  {% include "include/footer.html" %}
+{% endblock %}

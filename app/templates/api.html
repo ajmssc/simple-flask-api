@@ -1,0 +1,30 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+  <div class="container">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-md-5">
+          <h1 class="text-justify text-muted">API</h1>
+          <p class="lead">
+            Bitcoin block
+            <input type="text" id="query_name" size=15>
+            <input type="submit" id="query_button" value="Query"> 
+            <div id="api_results"></div>
+            <script>
+              $('#query_button').click(function() {
+                $.ajax({ url: '/api/getblock/' + $('#query_name').val(), context: document.body }).done(function(data) {
+                  $('#api_results').text(JSON.stringify(data, null, 4));
+                });
+              });
+            </script>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block footer %}
+  {% include "include/footer.html" %}
+{% endblock %}

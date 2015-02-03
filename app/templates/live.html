@@ -1,0 +1,279 @@
+{% extends "layout/base.html" %}
+
+{% block page_header %}
+  Live data
+{% endblock %}
+
+{% block content %}
+
+
+<script src="http://code.highcharts.com/highcharts.js"></script>
+<script src="http://code.highcharts.com/modules/exporting.js"></script>
+<div class="row">
+  <div class="col-lg-4">
+      <div id="container-incoming_volume" style="min-width: 310px; height: 300px; margin: 0 auto"></div>
+  </div>
+  <div class="col-lg-4">
+      <div id="container-incoming_transactions" style="min-width: 310px; height: 300px; margin: 0 auto"></div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+          Last 10 minutes
+        </div>
+        <div class="panel-body">
+          <h5>Total Transactions <small class="pull-right" style="font-size:12pt" id="total_transactions"></small></h5>
+          <h5>Moving Average of Transaction Volume<small class="pull-right" style="font-size:12pt" id="avg_amount"></small></h5>
+          <h5>Maximum Transaction Volume<small class="pull-right" style="font-size:12pt" id="max_amount"></small></h5>
+          <h5>Minimum Transaction Volume<small class="pull-right" style="font-size:12pt" id="min_amount"></small></h5>
+          <h5>Total Volume <small class="pull-right" style="font-size:12pt" id="total_amount"></small></h5>
+          <h5>Moving Average of Fees <small class="pull-right" style="font-size:12pt" id="avg_fees"></small></h5>
+          <h5>Maximum Fees <small class="pull-right" style="font-size:12pt" id="max_fees"></small></h5>
+          <!-- <h5>Minimum Fees <small class="pull-right" style="font-size:12pt" id="min_fees"></small></h5> -->
+          <h5>Total Fees <small class="pull-right" style="font-size:12pt" id="total_fees"></small></h5>
+        </div>
+      </div>
+  </div>
+</div>
+
+
+
+
+
+
+
+<div class="panel panel-default">
+  <div class="panel-heading">
+      <i class="fa fa-bolt fa-fw"></i>
+  </div>
+  <div class="panel-body">
+      <div id="event_list" class="list-group">
+      </div>
+  </div>
+</div>
+
+
+
+
+
+<script>
+
+function add_transaction(transaction) {
+    var vins = {};
+    var vouts = {};
+    $.each(transaction, function(key, val){
+      if (key.substr(0, 3) == "vin") {
+          var id = key.split('_')[1];
+          if (!(id in vins)) vins[id] = {};
+          vins[id]["address"] = transaction["vin_" + id + "_address"];
+          vins[id]["amount"] = transaction["vin_" + id + "_amount"];
+      }
+      if (key.substr(0, 4) == "vout") {
+          var id = key.split('_')[1];
+          if (!(id in vouts)) vouts[id] = {};
+          vouts[id]["address"] = transaction["vout_" + id + "_address"];
+          vouts[id]["amount"] = transaction["vout_" + id + "_amount"];
+      }
+    });
+    console.log(vins);
+    var transaction_table = "<table class='table'><thead><th>Sending</th><th></th><th>Receiving</th></thead><tr><td>";
+    $.each(vins, function(key, val){
+      transaction_table += "From:" + val.address;
+      transaction_table += " <font color='red'>-" + parseFloat(val.amount) + "</font><BR>";
+    });
+    transaction_table += "</td><td width=100></td><td>";
+    $.each(vouts, function(key, val){
+      transaction_table += "To:" + val.address;
+      transaction_table += " <font color='green'>" + parseFloat(val.amount) + "</font><BR>";
+    });
+    transaction_table += "</td></tr></table>";
+
+    var html = "<div class='list-group-item'>\
+            <div class='chat-body clearfix'>\
+                <div class='header'>\
+                    <a href='#' onclick=\"$('#transaction_details_" + transaction.txid + "').toggle();\">\
+                    <strong class='primary-font'>" + new Date(transaction.time * 1000).toLocaleString() + "</strong>\
+                    <span class='text-muted' style='font-size:9pt; text-align:right'>ref:#" + transaction.txid + "</span></a>\
+                    <span class='pull-right text-muted' style='width:160px; font-size:9pt; text-align:left'>&nbsp;(fees: " + parseFloat(transaction.fees) + ")</span>\
+                    <span class='pull-right' style='width:160px; font-size:12pt; text-align:left'>\
+                      <i class='fa fa-bitcoin'></i> " + parseFloat(transaction.amount) + "</span>\
+                </div>\
+                <div id='transaction_details_" + transaction.txid + "' style='display:none'>" + transaction_table + "</div>\
+            </div>\
+          </div>";
+
+    $('#event_list').prepend(html);
+  }
+
+  function query_new_transactions() {
+
+    $.ajax({ url: '/api/getlivetransactions/' + (typeof latest_transaction_time != "undefined" ? latest_transaction_time : '') }).done(function(data) {
+      console.log(data);
+      var total_amount = 0;
+      var total_transactions = 0;
+      if (data.transactions.length > 0) {
+        //console.log("latest time = ", data.transactions[0].time);
+        latest_transaction_time = parseInt(data.transactions[0].time) + 1;
+
+        $.each(data.transactions, function(id, transaction) {
+          add_transaction(transaction);
+          total_amount += transaction.amount;
+          total_transactions += 1;
+        });
+
+        //update dynamic graph
+      }
+      var x = (new Date()).getTime(), 
+          y1 = parseFloat(total_amount), 
+          y2 = total_transactions;
+      var chart = $('#container-incoming_volume').highcharts();
+      var series = chart.series[0];
+      series.addPoint([x, y1], true, true);
+      var chart = $('#container-incoming_transactions').highcharts();
+      var series = chart.series[0];
+      series.addPoint([x, y2], true, true);
+
+
+      setTimeout(query_new_transactions,500);
+    });
+  }
+
+
+
+
+  $(function () {
+    $(document).ready(function () {
+        Highcharts.setOptions({
+            global: {
+                useUTC: false
+            }
+        });
+
+        $('#container-incoming_volume').highcharts({
+            chart: {
+                type: 'spline',
+                animation: Highcharts.svg, // don't animate in old IE
+                marginRight: 10,
+                events: {
+                    load: function () {
+
+                    }
+                }
+            },
+            title: { text: 'Bitcoins exchanged' },
+            xAxis: { type: 'datetime', tickPixelInterval: 150 },
+            yAxis: { title: { text: 'Bitcoins' }, plotLines: [{ value: 0, width: 1, color: '#808080' }] },
+            tooltip: {
+                formatter: function () {
+                    return '<b>' + this.series.name + '</b><br/>' +
+                        Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', this.x) + '<br/>' +
+                        Highcharts.numberFormat(this.y, 2);
+                }
+            },
+            legend: { enabled: false },
+            exporting: { enabled: false },
+            series: [{
+                name: 'Bitcoins exchanged',
+                data: (function () {
+                    var data = [], time = (new Date()).getTime(), i;
+                    for (i = -19; i <= 0; i += 1) {
+                        data.push({ x: time + i * 1000, y: 0 });
+                    }
+                    return data;
+                }())
+            }]
+        });
+
+        $('#container-incoming_transactions').highcharts({
+            chart: {
+                type: 'spline',
+                animation: Highcharts.svg, // don't animate in old IE
+                marginRight: 10,
+                events: {
+                    load: function () {
+
+                    }
+                }
+            },
+            title: { text: 'Transactions' },
+            xAxis: { type: 'datetime', tickPixelInterval: 150 },
+            yAxis: { title: { text: 'Transactions' }, plotLines: [{ value: 0, width: 1, color: '#808080' }] },
+            tooltip: {
+                formatter: function () {
+                    return '<b>' + this.series.name + '</b><br/>' +
+                        Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', this.x) + '<br/>' +
+                        Highcharts.numberFormat(this.y, 2);
+                }
+            },
+            legend: { enabled: false },
+            exporting: { enabled: false },
+            series: [{
+                name: 'Transactions',
+                data: (function () {
+                    var data = [], time = (new Date()).getTime(), i;
+                    for (i = -19; i <= 0; i += 1) {
+                        data.push({ x: time + i * 1000, y: 0 });
+                    }
+                    return data;
+                }())
+            }]
+        });
+
+
+    });
+  });
+
+
+      function refresh_statistics() {
+          $.get( "/api/getrealtimestats", function( apidata ) {
+            if (apidata) {
+              
+              $('#total_transactions').html(parseFloat(apidata["metadata:total_transactions"]));
+              $('#total_amount').html(parseFloat(apidata["metadata:total_volume"]));
+              $('#avg_amount').html(parseFloat(apidata["metadata:average_volume"]));
+              $('#max_amount').html(parseFloat(apidata["metadata:maximum_volume"]));
+              $('#min_amount').html(parseFloat(apidata["metadata:minimum_volume"]));
+              $('#avg_fees').html(parseFloat(apidata["metadata:average_fees"]));
+              $('#max_fees').html(parseFloat(apidata["metadata:maximum_fees"]));
+              //$('#min_fees').html(parseFloat(apidata["metadata:minimum_fees"]));
+              $('#total_fees').html(parseFloat(apidata["metadata:total_fees"]));
+            }
+          });
+        
+      }
+
+
+     
+
+
+    $().ready(function() {
+      query_new_transactions();
+      refresh_statistics();
+      setInterval(refresh_statistics, 1000);
+    });
+
+
+
+
+
+
+
+
+
+
+</script>
+                    
+{% endblock %}
+
+{% block footer %}
+  {% include "include/footer.html" %}
+{% endblock %}
+
+
+
+
+
+
+
+

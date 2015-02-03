@@ -1,0 +1,105 @@
+{% extends "layout/base.html" %}
+
+{% block page_header %}
+	Bitcoin Inspector
+{% endblock %}
+
+{% block content %}
+	<div class="row">
+		<div class="col-lg-4">
+	        <div class="panel panel-primary">
+	            <div class="panel-heading">
+	                Presentation
+	            </div>
+	            <div class="panel-body">
+	                <a href="/presentation">
+	                	<img src="/static/images/thumbs/presentation.png" width="100%">
+	                	<BR>
+	                </a>
+	                <p>Presentation deck used for company demos.</p>
+	                
+	            </div>
+	        </div>
+	    </div>
+	    <div class="col-lg-4">
+	        <div class="panel panel-primary">
+	            <div class="panel-heading">
+	                Live Data
+	            </div>
+	            <div class="panel-body">
+	                <a href="/live">
+	                	<img src="/static/images/thumbs/live.png" width="100%">
+	                	<BR>
+	                </a>
+	                <p>Live data from the Bitcoin network.</p>
+	                
+	            </div>
+	        </div>
+	    </div>
+	    <div class="col-lg-4">
+	        <div class="panel panel-primary">
+	            <div class="panel-heading">
+	                Block History
+	            </div>
+	            <div class="panel-body">
+	                <a href="/history_blocks">
+	                	<img src="/static/images/thumbs/blocks.png" width="100%">
+	                	<BR>
+	                </a>
+	                <p>Block chain historical data.</p>
+	                
+	            </div>
+	        </div>
+	    </div>
+	</div>
+	<div class="row">
+		<div class="col-lg-4">
+	        <div class="panel panel-primary">
+	            <div class="panel-heading">
+	                Wallet Data
+	            </div>
+	            <div class="panel-body">
+	                <a href="/wallets">
+	                	<img src="/static/images/thumbs/wallet.png" width="100%">
+	                	<BR>
+	                </a>
+	                <p>Bitcoin wallet distribution.</p>
+	            </div>
+	        </div>
+	    </div>
+	    <div class="col-lg-4">
+	        <div class="panel panel-primary">
+	            <div class="panel-heading">
+	                Transaction History
+	            </div>
+	            <div class="panel-body">
+	                <a href="/history_transactions">
+	                	<img src="/static/images/thumbs/transactions.png" width="100%">
+	                	<BR>
+	                </a>
+	                <p>Transaction history data.</p>
+	                
+	            </div>
+	        </div>
+	    </div>
+	    <div class="col-lg-4">
+	        <div class="panel panel-primary">
+	            <div class="panel-heading">
+	                Price Data
+	            </div>
+	            <div class="panel-body">
+	                <a href="/history_prices">
+	                	<img src="/static/images/thumbs/price.png" width="100%">
+	                	<BR>
+	                </a>
+	                <p>Price history data.</p>
+	                
+	            </div>
+	        </div>
+	    </div>
+	</div>
+{% endblock %}
+
+{% block footer %}
+  {% include "include/footer.html" %}
+{% endblock %}

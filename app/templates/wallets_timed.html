@@ -1,0 +1,120 @@
+{% extends "layout/base.html" %}
+
+{% block page_header %}
+	Wallets Range Query Performance
+{% endblock %}
+
+{% block content %}
+
+<div id='wallet_list_title'></div>
+<div class="row">
+	<div class="col-lg-12">
+		Search wallets with balance between: 
+		<label><input id="balance_from" type="text" size=8 class="form-control" placeholder="1000"></label> and
+		<label><input id="balance_to" type="text" size=8 class="form-control" placeholder="2000"></label>
+		<button class="btn btn-default" onmousedown="javascript:launch_query();" type="button"><i class="fa fa-search"></i></button>
+	</div>
+</div>
+
+<div class="row">
+	<div class="col-lg-6">
+		<div class="panel panel-default">
+			<div class="panel-heading">&nbsp;MySQL Results</div>
+			<div class="panel-body">
+				<div id="query_stats_mysql" style="font-size: 14pt; margin-bottom: 5px;"></div>
+				<div id="wallet_list_mysql" class="list-group"></div>
+			</div>
+		</div>	        
+	</div>
+	<div class="col-lg-6">
+		<div class="panel panel-default">
+			<div class="panel-heading">&nbsp;Cassandra Results</div>
+			<div class="panel-body">
+				<div id="query_stats_cassandra" style="font-size: 14pt; margin-bottom: 5px;"></div>
+				<div id="wallet_list_cassandra" class="list-group"></div>
+			</div>
+		</div>	        
+	</div>
+</div>
+
+
+
+
+<script>
+
+
+	function add_wallet(div_id, wallet) {
+		var html = "<div class='list-group-item'>\
+							<div class='chat-body clearfix'>\
+							    <div class='header'>\
+							        <strong class='primary-font' style='font-size:8pt'>" + wallet.address + "</strong>\
+							        <span class='pull-right' style='font-size:8pt; text-align:left'>\
+							          <i class='fa fa-bitcoin'></i> " + parseFloat(wallet.balance) + "</span>\
+							    </div>\
+							</div>\
+						</div>";
+		$('#' + div_id).append(html);
+	}
+
+	function launch_query() {
+		var balance_from = $('#balance_from').val();
+		balance_from = balance_from ? parseInt(balance_from) : 1000;
+		balance_from = balance_from < 0 ? 0 : balance_from;
+		var balance_to = $('#balance_to').val();
+		balance_to = balance_to ? parseInt(balance_to) : 2000;
+		balance_to = balance_to < 0 ? 0 : balance_to;
+		console.log("query", balance_from, balance_to);
+		//mysql
+		mysql_start_timestamp = new Date().getTime();
+		$('#query_stats_mysql').html("Querying...");
+		$.get('/api/getwalletlist/?start=' + balance_from + '&end=' + balance_to, function (wallet_list) {
+			var query_perf = new Date().getTime() - mysql_start_timestamp;
+			$('#query_stats_mysql').html(wallet_list.wallets.length + " results fetched in " + query_perf + " ms.");
+			$('#wallet_list_mysql').html("");
+			// $('#wallet_list_title').html('<h2>Showing first ' + wallet_list.wallets.length + ' wallets between ' + start + ' and ' + end + ' bitcoins</h2>');
+			$.each(wallet_list.wallets, function(id, wallet) {
+				add_wallet("wallet_list_mysql", wallet);
+			});
+		});
+		//cassandra
+		cassandra_start_timestamp = new Date().getTime();
+		$('#query_stats_cassandra').html("Querying...");
+		$.get('/api/getwalletlist_cassandra/?start=' + balance_from + '&end=' + balance_to, function (wallet_list) {
+			var query_perf = new Date().getTime() - cassandra_start_timestamp;
+			$('#query_stats_cassandra').html(wallet_list.wallets.length + " results fetched in " + query_perf + " ms.");
+			$('#wallet_list_cassandra').html("");
+			// $('#wallet_list_title').html('<h2>Showing first ' + wallet_list.wallets.length + ' wallets between ' + start + ' and ' + end + ' bitcoins</h2>');
+			$.each(wallet_list.wallets, function(id, wallet) {
+				add_wallet("wallet_list_cassandra", wallet);
+			});
+		});
+	
+	}
+	// //update list of wallets
+	// start = lowrange * Math.pow(10, drilldown_level);
+	// end = highrange * Math.pow(10, drilldown_level);
+	// $('#wallet_list_title').html('<h2>Looking for wallets between ' + start + ' and ' + end + ' bitcoins...</h2>');
+	// $('#wallet_list').html("Loading wallets. Please wait...");
+	// $.get('/api/getwalletlist/?start=' + start + '&end=' + end, function (wallet_list) {
+	// 	$('#wallet_list').html("");
+	// 	$('#wallet_list_title').html('<h2>Showing first ' + wallet_list.wallets.length + ' wallets between ' + start + ' and ' + end + ' bitcoins</h2>');
+	// 	$.each(wallet_list.wallets, function(id, wallet) {
+	// 		var html = "<div class='list-group-item'>\
+	// 			<div class='chat-body clearfix'>\
+	// 			    <div class='header'>\
+	// 			        <strong class='primary-font'>" + wallet.address + "</strong>\
+	// 			        <span class='pull-right' style='width:160px; font-size:12pt; text-align:left'>\
+	// 			          <i class='fa fa-bitcoin'></i> " + parseFloat(wallet.balance) + "</span>\
+	// 			    </div>\
+	// 			</div>\
+	// 		</div>";
+	// 		$('#wallet_list').append(html);
+	// 	});
+	// });
+</script>
+                    
+{% endblock %}
+
+{% block footer %}
+  {% include "include/footer.html" %}
+{% endblock %}
